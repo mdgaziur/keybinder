@@ -101,7 +101,8 @@ impl<T> KeyBinder<T> {
     /// Caller has to make sure that data isn't freed twice and the data_ptr is valid
     unsafe fn unbind_impl(keystring: &str, data_ptr: *mut c_void) {
         let c_keystring = CString::new(keystring).unwrap();
-
+        
+        // TODO: check if it's still leaking or not
         let _ = Box::<Payload<T>>::from_raw(data_ptr as *mut Payload<T>);
 
         keybinder_unbind(c_keystring.as_ptr());
