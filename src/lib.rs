@@ -15,7 +15,7 @@ extern "C" {
     ) -> bool;
     fn keybinder_get_current_event_time() -> u32;
     fn keybinder_set_use_cooked_accelerators(use_cooked: bool);
-    fn keybinder_unbind(keystring: *const c_char);
+    fn keybinder_unbind_all(keystring: *const c_char);
     fn keybinder_supported() -> bool;
 }
 
@@ -105,7 +105,7 @@ impl<T> KeyBinder<T> {
         // TODO: check if it's still leaking or not
         let _ = Box::<Payload<T>>::from_raw(data_ptr as *mut Payload<T>);
 
-        keybinder_unbind(c_keystring.as_ptr());
+        keybinder_unbind_all(c_keystring.as_ptr());
     }
 }
 
