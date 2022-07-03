@@ -1,5 +1,6 @@
 # Keybinder
 ![crates.io](https://img.shields.io/crates/v/keybinder.svg)
+
 Wraps Keybinder in a safe way
 
 # Example
