@@ -1,6 +1,6 @@
 [package]
 name = "keybinder"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["MD Gaziur Rahman Noor <mdgaziurrahmannoor@gmail.com>"]
 description = "Rust wrapper for Keybinder"
