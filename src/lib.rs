@@ -28,9 +28,8 @@ struct Payload<T> {
 
 /// # Safety:
 ///
-/// KeyBinder::bind() puts valid data after calling Box::leak() (to prevent use after free)
-/// in data_ptr hence dereferencing it shouldn't cause
-/// any problems. right?
+/// KeyBinder::bind() puts valid data after calling `Box::leak()` (to prevent use after free)
+/// in data_ptr hence dereferencing it shouldn't cause any problems. right?
 unsafe extern "C" fn handler_impl<T>(c_keystring: *const c_char, data: *mut c_void) {
     let keystring = CStr::from_ptr(c_keystring).to_str().unwrap();
     let payload = ptr::NonNull::new(data as *mut Payload<T>).unwrap().as_mut();
@@ -38,12 +37,50 @@ unsafe extern "C" fn handler_impl<T>(c_keystring: *const c_char, data: *mut c_vo
     (payload.user_handler)(keystring.to_string(), &payload.user_data)
 }
 
+/// # Main Keybinder struct
+///
+/// This struct is a safe wrapper for KeyBinder and contains functions to
+/// initialize KeyBinder, bind keys and then unbind keys.
+///
+/// The struct guarantees that `keybinder_init` is called only once. This means
+/// you can use this struct anywhere inside your code. Only the first time you call
+/// `KeyBinder::new()` will call `keybinder_init`.
+///
+/// # Note
+///
+/// Make sure you initialize GTK before initializing KeyBinder
+///
+///
+/// Example:
+///
+/// ```
+/// use keybinder::KeyBinder;
+///
+/// fn main() {
+///     gtk::init().expect("Failed to init GTK");
+///     let data = String::from("some data");
+///     let mut keybinder = KeyBinder::<String>::new(true).expect("Keybinder is not supported");
+///
+///     assert_eq!(keybinder.bind("<Shift>space", |key, data| {
+///         println!("key: {} , data: {}", key, data);
+///         gtk::main_quit();
+///     }, data), true);
+///     println!("Successfully bound keystring to handler");
+///     gtk::main();
+/// }
+/// ```
+///
+#[derive(Debug)]
 pub struct KeyBinder<T> {
     data_ptrs: HashMap<String, *mut c_void>,
     _marker: PhantomData<T>,
 }
 
 impl<T> KeyBinder<T> {
+    /// Creates and initializes Keybinder(It it's not already initialized).
+    ///
+    /// # Returns
+    /// `Ok(Self)` if KeyBinder is supported. Otherwise, `Err(())`.
     pub fn new(use_cooked: bool) -> Result<Self, ()> {
         if !unsafe { keybinder_supported() } {
             return Err(());
@@ -61,6 +98,8 @@ impl<T> KeyBinder<T> {
         })
     }
 
+    /// Binds handler to given keystring and passes the user data to handler
+    /// when key is pressed.
     pub fn bind(&mut self, keystring: &str, user_handler: fn(String, &T), user_data: T) -> bool {
         // To make sure the keystring is not already bound.
         // It'll not do anything if the keystring isn't bound.
@@ -83,10 +122,11 @@ impl<T> KeyBinder<T> {
         unsafe { keybinder_bind(c_keystring.as_ptr(), handler_impl::<T>, payload_ptr) }
     }
 
+    /// Unbinds the given keystring. If it's not bound, it does nothing.
     pub fn unbind(&mut self, keystring: &str) {
         if self.data_ptrs.contains_key(keystring) {
-            // SAFETY: Two `keystring` can't have the save data_ptr. This prevents use after free.
-            //         Also, the data is alloc'd by KeyBinder::bind() and never dealloc'd unless
+            // SAFETY: Two `keystring` can't have the save data_ptr. This prevents double free.
+            //         Also, the data is alloc'd by KeyBinder::bind() and is never dealloc'd unless
             //         the user unbinds it. In that case, KeyBinder::unbind() removes the data_ptr from
             //         the hashmap.
             unsafe {
@@ -116,7 +156,7 @@ pub fn get_current_event_time() -> u32 {
 impl<T> Drop for KeyBinder<T> {
     fn drop(&mut self) {
         for keystring in self.data_ptrs.keys() {
-            // SAFETY: Two `keystring` can't have the save data_ptr. This prevents use after free.
+            // SAFETY: Two `keystring` can't have the save data_ptr. This prevents double free.
             //         Also, the data is alloc'd by KeyBinder::bind() and never dealloc'd unless
             //         the user unbinds it. In that case, KeyBinder::unbind() removes the data_ptr from
             //         the hashmap.
